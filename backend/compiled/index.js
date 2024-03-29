@@ -1,4 +1,8 @@
 "use strict";
-const x = "Hello";
-const y = " World";
-console.log(x + y);
+const http = require('http');
+const port = 3000;
+const host = "localhost";
+const server = http.createServer((req, res) => {
+    console.log(req.url, req.method);
+});
+server.listen(port, () => console.log(`Server listening on port ${port}`));
