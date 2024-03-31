@@ -14,6 +14,11 @@ const server = http.createServer((req: any, res: any) => {
         data: 'Hellow'
     };
 
+    if(req.url == '/login'){
+        console.log('We are in the login page');
+        
+    }
+
     if(req.method == 'POST'){
         console.log('Post request');
         //Makes the header based on whatever Content-Type that we want, but
@@ -25,7 +30,10 @@ const server = http.createServer((req: any, res: any) => {
         }));
     }
     else{
-        res.end('Hello world');
+        //console.log("This is not a post request");
+        res.writeHead(200, {'Content-Type':'text/plain'});
+        res.write("Welcome to this server");
+        res.end();
     }
     
 });
