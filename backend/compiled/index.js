@@ -20,15 +20,62 @@ const server = http.createServer(async (req, res) => {
     const connectToDB = await connection.dbConnection();
     switch (req.url) {
         case '/':
+            const password = '1234';
+            const hash = await bcrypt.hash(password, 10);
+            const match = await bcrypt.compare(password, hash);
+            console.log(match);
             res.writeHead(200, { 'Content-Type': 'text/plain' });
             res.write("Welcome to login practice go to the url paths /login and /signup");
             res.end();
             break;
         case '/login':
             if (req.method === 'POST') {
-                res.writeHead(200, { 'Content-Type': 'text/plain' });
-                res.write("WORKING ON THE LOGIN");
-                res.end();
+                try {
+                    let username = "";
+                    let password = "";
+                    let statusCode = 200;
+                    let httpMessage = "";
+                    let hashPassword = "";
+                    req.on('data', async (data) => {
+                        let body = await JSON.parse(data);
+                        console.log(body);
+                        username = body.username;
+                        password = body.password;
+                        const query = 'SELECT * FROM `user` WHERE `Username` = ?';
+                        const values = [username];
+                        const [rows, fields] = await connectToDB.execute(query, values);
+                        if (rows.length === 0) {
+                            statusCode = 404;
+                            httpMessage = "User not found";
+                        }
+                        else {
+                            hashPassword = rows[0].Password;
+                            console.log("Retrieved Hash:", hashPassword);
+                            console.log(hashPassword.length);
+                            console.log(password.charCodeAt(0));
+                            const isMatch = await bcrypt.compare(password, hashPassword);
+                            console.log("Password Match:", isMatch);
+                            if (isMatch) {
+                                statusCode = 200;
+                                httpMessage = "Valid user: " + rows[0].message;
+                            }
+                            else {
+                                statusCode = 401; // Unauthorized
+                                httpMessage = "Invalid password";
+                            }
+                        }
+                        res.writeHead(statusCode, { 'Content-Type': 'text/plain' });
+                        res.write(httpMessage);
+                        res.end();
+                    });
+                    // req.on('end', async () => {
+                    //     res.writeHead(statusCode, {'Content-Type':'text/plain'});
+                    //     res.write(httpMessage);
+                    //     res.end(); 
+                    // })
+                }
+                catch (error) {
+                }
             }
             break;
         case '/signup':
@@ -39,21 +86,19 @@ const server = http.createServer(async (req, res) => {
                     let message = "";
                     //To access the body of a http request in node:http we need to use the req.on('data')
                     //Similar to how we did in the tcp server, but we don't have to parse the entire http message
-                    req.on('data', (data) => {
+                    req.on('data', async (data) => {
                         let body = JSON.parse(data);
                         console.log(body);
                         username = body.username;
                         password = body.password;
                         message = body.message;
-                    });
-                    bcrypt.hash(password, saltRounds, async (err, hash) => {
+                        const hash = await bcrypt.hash(password, saltRounds);
                         try {
                             //For the query just follow the same format as stated in the mysql2 docs
                             const query = 'INSERT INTO `user`(`username`, `password`, `message`) VALUES (?, ?, ?)';
                             const values = [username, hash, message];
+                            console.log(username + ", " + password + ", " + ", " + message);
                             const [result, fields] = await connectToDB.execute(query, values);
-                            console.log(result);
-                            console.log(fields);
                             res.writeHead(201, { 'Content-Type': 'text/plain' });
                             res.write("Successfully created the new user");
                             res.end();
@@ -67,7 +112,7 @@ const server = http.createServer(async (req, res) => {
                     });
                 }
                 catch (error) {
-                    res.writeHead(501, { 'Content-Type': 'text/plain' });
+                    res.writeHead(401, { 'Content-Type': 'text/plain' });
                     res.write("Server error in trying to sign a user up");
                     res.end();
                     console.log(error);
