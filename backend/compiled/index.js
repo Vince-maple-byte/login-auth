@@ -8,21 +8,16 @@ const port = parseInt(process.env.PORT || '3000', 10);
 const host = process.env.HOST || 'localhost';
 const saltRounds = 10;
 //Mysql database connection
-(async () => {
-    try {
-        const dbConnection = await connection.dbConnection();
-    }
-    catch (error) {
-        console.log(error);
-    }
-})();
 console.log(process.env.DB_USER);
-const server = http.createServer((req, res) => {
+const server = http.createServer(async (req, res) => {
     //console.log(req.url + ": "+ req.method);
     //Example of sending a http response from a post request
     let json = {
         data: `${req.url}`
     };
+    //Mysql database connection. Since we are making this database in a node:http instead of express.js 
+    //we need to make the connection inside of the http.createServer() method
+    const connectToDB = await connection.dbConnection();
     switch (req.url) {
         case '/':
             res.writeHead(200, { 'Content-Type': 'text/plain' });
@@ -38,31 +33,45 @@ const server = http.createServer((req, res) => {
             break;
         case '/signup':
             if (req.method === 'POST') {
-                let username = "";
-                let password = "";
-                let message = "";
-                req.on('data', (data) => {
-                    let body = JSON.parse(data);
-                    console.log(body);
-                    username = body.username;
-                    password = body.password;
-                    message = body.message;
-                });
-                bcrypt.hash(password, saltRounds, async (err, hash) => {
-                    try {
-                        const query = `INSERT INTO 'user'('username', 'password', 'message') 
-                        VALUES (${username}, ${hash}, ${message})`;
-                        const [result, fields] = await dbConnection.query(query);
-                        console.log(result);
-                        console.log(fields);
-                    }
-                    catch (error) {
-                        console.error(error);
-                    }
-                });
-                res.writeHead(201, { 'Content-Type': 'text/plain' });
-                res.write("Successfully created the new user");
-                res.end();
+                try {
+                    let username = "";
+                    let password = "";
+                    let message = "";
+                    //To access the body of a http request in node:http we need to use the req.on('data')
+                    //Similar to how we did in the tcp server, but we don't have to parse the entire http message
+                    req.on('data', (data) => {
+                        let body = JSON.parse(data);
+                        console.log(body);
+                        username = body.username;
+                        password = body.password;
+                        message = body.message;
+                    });
+                    bcrypt.hash(password, saltRounds, async (err, hash) => {
+                        try {
+                            //For the query just follow the same format as stated in the mysql2 docs
+                            const query = 'INSERT INTO `user`(`username`, `password`, `message`) VALUES (?, ?, ?)';
+                            const values = [username, hash, message];
+                            const [result, fields] = await connectToDB.execute(query, values);
+                            console.log(result);
+                            console.log(fields);
+                            res.writeHead(201, { 'Content-Type': 'text/plain' });
+                            res.write("Successfully created the new user");
+                            res.end();
+                        }
+                        catch (error) {
+                            res.writeHead(501, { 'Content-Type': 'text/plain' });
+                            res.write("Server error in trying to sign a user up");
+                            res.end();
+                            console.error(error + "\n Ericdoa");
+                        }
+                    });
+                }
+                catch (error) {
+                    res.writeHead(501, { 'Content-Type': 'text/plain' });
+                    res.write("Server error in trying to sign a user up");
+                    res.end();
+                    console.log(error);
+                }
             }
             break;
         default:
