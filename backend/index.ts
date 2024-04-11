@@ -39,11 +39,21 @@ const server = http.createServer(async(req: any, res: any) => {
 
     switch (req.url) {
         case '/':
-            const password = '1234'
-            const hash = await bcrypt.hash(password, 10);
+            //For when an user needs to delete their account. Need to confirm if the password is valid or not with jwt
+            if(req.method === 'DELETE'){
 
-            const match = await bcrypt.compare(password, hash);
-            console.log(match);
+            }
+
+            //For when an user wants to update there password or the message. Need to confirm if the password is valid or not with jwt
+            if(req.method === 'PUT'){
+
+            }
+
+            //Return the user message
+            if(req.method === 'GET'){
+
+            }
+            
             res.writeHead(200, {'Content-Type':'text/plain'});
             res.write("Welcome to login practice go to the url paths /login and /signup");
             res.end();
@@ -88,23 +98,9 @@ const server = http.createServer(async(req: any, res: any) => {
                         res.write(httpMessage);
                         res.end();
                     });
-                    
-
-                    // req.on('end', async () => {
-                    //     res.writeHead(statusCode, {'Content-Type':'text/plain'});
-                    //     res.write(httpMessage);
-                    //     res.end(); 
-                    // })
-                    
-                    
-                    
-
-                    
                 } catch (error) {
-                    
+                    console.log(error);
                 }
-
-                
             }
             break;
         case '/signup':
@@ -138,10 +134,7 @@ const server = http.createServer(async(req: any, res: any) => {
                             res.end();
                             console.error(error + "\n Ericdoa");
                         }
-                    })
-                    
-                    
-                    
+                    });
                 } catch (error) {
                     res.writeHead(401, {'Content-Type':'text/plain'});
                     res.write("Server error in trying to sign a user up");
