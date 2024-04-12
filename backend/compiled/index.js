@@ -2,6 +2,7 @@
 const http = require('http');
 const connection = require('./database/connection');
 const bcrypt = require('bcrypt');
+const jwtAuth = require('./jwt');
 require('dotenv').config();
 //Env variables and variables used for later
 const port = parseInt(process.env.PORT || '3000', 10);
@@ -20,13 +21,24 @@ const server = http.createServer(async (req, res) => {
     const connectToDB = await connection.dbConnection();
     switch (req.url) {
         case '/':
-            const password = '1234';
-            const hash = await bcrypt.hash(password, 10);
-            const match = await bcrypt.compare(password, hash);
-            console.log(match);
-            res.writeHead(200, { 'Content-Type': 'text/plain' });
-            res.write("Welcome to login practice go to the url paths /login and /signup");
-            res.end();
+            //For when an user needs to delete their account. Need to confirm if the password is valid or not with jwt
+            if (req.method === 'DELETE') {
+                const token = req.headers.authorization.split(" ")[1];
+                const user = jwtAuth.jwtVerify(token);
+                console.log(user);
+                res.writeHead(201, { 'Content-Type': 'text/plain' });
+                res.write(JSON.stringify(user));
+                res.end();
+            }
+            //For when an user wants to update there password or the message. Need to confirm if the password is valid or not with jwt
+            if (req.method === 'PUT') {
+            }
+            //Return the user message
+            if (req.method === 'GET') {
+            }
+            // res.writeHead(200, {'Content-Type':'text/plain'});
+            // res.write("Welcome to login practice go to the url paths /login and /signup");
+            // res.end();
             break;
         case '/login':
             if (req.method === 'POST') {
@@ -37,7 +49,7 @@ const server = http.createServer(async (req, res) => {
                     let httpMessage = "";
                     let hashPassword = "";
                     req.on('data', async (data) => {
-                        let body = await JSON.parse(data);
+                        let body = await JSON.parse(data.toString());
                         console.log(body);
                         username = body.username;
                         password = body.password;
@@ -45,45 +57,41 @@ const server = http.createServer(async (req, res) => {
                         const values = [username];
                         const [rows, fields] = await connectToDB.execute(query, values);
                         if (rows.length === 0) {
-                            statusCode = 404;
+                            //We want to keep the error code for if the username is not found in the database
+                            //and the password is invalid because we don't want to people to know whether the password is incorrect or the username
+                            statusCode = 401;
                             httpMessage = "User not found";
                         }
                         else {
                             hashPassword = rows[0].Password;
-                            console.log("Retrieved Hash:", hashPassword);
-                            console.log(hashPassword.length);
-                            console.log(password.charCodeAt(0));
                             const isMatch = await bcrypt.compare(password, hashPassword);
-                            console.log("Password Match:", isMatch);
+                            //In Here we are going
                             if (isMatch) {
                                 statusCode = 200;
-                                httpMessage = "Valid user: " + rows[0].message;
+                                const payload = { username: body.username, message: rows[0].message };
+                                httpMessage = JSON.stringify(jwtAuth.jwtSign(payload));
                             }
                             else {
                                 statusCode = 401; // Unauthorized
-                                httpMessage = "Invalid password";
+                                httpMessage = "User not found";
                             }
                         }
                         res.writeHead(statusCode, { 'Content-Type': 'text/plain' });
                         res.write(httpMessage);
                         res.end();
                     });
-                    // req.on('end', async () => {
-                    //     res.writeHead(statusCode, {'Content-Type':'text/plain'});
-                    //     res.write(httpMessage);
-                    //     res.end(); 
-                    // })
                 }
                 catch (error) {
+                    console.log(error);
                 }
             }
             break;
         case '/signup':
             if (req.method === 'POST') {
                 try {
-                    let username = "";
-                    let password = "";
-                    let message = "";
+                    let username;
+                    let password;
+                    let message;
                     //To access the body of a http request in node:http we need to use the req.on('data')
                     //Similar to how we did in the tcp server, but we don't have to parse the entire http message
                     req.on('data', async (data) => {
@@ -91,13 +99,17 @@ const server = http.createServer(async (req, res) => {
                         console.log(body);
                         username = body.username;
                         password = body.password;
-                        message = body.message;
+                        if (body.message === undefined) {
+                            message = "";
+                        }
+                        else {
+                            message = body.message;
+                        }
                         const hash = await bcrypt.hash(password, saltRounds);
                         try {
                             //For the query just follow the same format as stated in the mysql2 docs
                             const query = 'INSERT INTO `user`(`username`, `password`, `message`) VALUES (?, ?, ?)';
                             const values = [username, hash, message];
-                            console.log(username + ", " + password + ", " + ", " + message);
                             const [result, fields] = await connectToDB.execute(query, values);
                             res.writeHead(201, { 'Content-Type': 'text/plain' });
                             res.write("Successfully created the new user");
@@ -107,7 +119,7 @@ const server = http.createServer(async (req, res) => {
                             res.writeHead(501, { 'Content-Type': 'text/plain' });
                             res.write("Server error in trying to sign a user up");
                             res.end();
-                            console.error(error + "\n Ericdoa");
+                            console.error(error);
                         }
                     });
                 }
@@ -125,38 +137,5 @@ const server = http.createServer(async (req, res) => {
             res.end();
             break;
     }
-    // switch (req.method) {
-    //     case 'POST':
-    //         console.log('Post request ' + req.url);
-    //         //We need to make an if statement checking if the location is in the 
-    //         //login page or the sign up page
-    //         // if(req.url){
-    //         // }
-    //         //Makes the header based on whatever Content-Type that we want, but
-    //         //Since we are sending a json data we use application/json
-    //         res.writeHead(200, {'Content-Type':'application/json'});
-    //         //res.end just specifies what we are sending to the body
-    //         res.end(JSON.stringify({
-    //             data: json.data,
-    //         }));
-    //         break;
-    //     case 'GET':
-    //         if(req.url == '/login'){
-    //             console.log('We are in the login page');
-    //         }
-    //         else{
-    //             //console.log("This is not a post request");
-    //             res.writeHead(200, {'Content-Type':'text/plain'});
-    //             res.write("Welcome to this server");
-    //             res.end();
-    //         }
-    //         break;
-    //     case 'PUT':
-    //         break;
-    //     case 'DELETE':
-    //         break;
-    //     default:
-    //         break;
-    //}
 });
 server.listen(port, () => console.log(`Server listening on port ${port}`));

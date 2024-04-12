@@ -1,6 +1,8 @@
 const http = require('http');
 const connection = require('./database/connection');
 const bcrypt = require('bcrypt');
+const jwtAuth = require('./jwt');
+
 require('dotenv').config();
 
 
@@ -23,6 +25,13 @@ type userInfo = {
     message?: string;
 }
 
+//This is going to be used for the jwt signing and verification might add a refresh flag to determine if the jwt token has been refreshed or not
+type payload = {
+    username: string;
+    message: string;
+    //refresh: boolean;
+}
+
 const server = http.createServer(async(req: any, res: any) => {
     //console.log(req.url + ": "+ req.method);
     //Example of sending a http response from a post request
@@ -37,7 +46,13 @@ const server = http.createServer(async(req: any, res: any) => {
         case '/':
             //For when an user needs to delete their account. Need to confirm if the password is valid or not with jwt
             if(req.method === 'DELETE'){
-                let username:string 
+                const token = req.headers.authorization.split(" ")[1];
+                const user = jwtAuth.jwtVerify(token);
+                console.log(user);
+
+                res.writeHead(201, {'Content-Type':'text/plain'});
+                res.write(JSON.stringify(user));
+                res.end();
             }
 
             //For when an user wants to update there password or the message. Need to confirm if the password is valid or not with jwt
@@ -50,9 +65,9 @@ const server = http.createServer(async(req: any, res: any) => {
 
             }
             
-            res.writeHead(200, {'Content-Type':'text/plain'});
-            res.write("Welcome to login practice go to the url paths /login and /signup");
-            res.end();
+            // res.writeHead(200, {'Content-Type':'text/plain'});
+            // res.write("Welcome to login practice go to the url paths /login and /signup");
+            // res.end();
             break;
 
         case '/login':
@@ -64,8 +79,9 @@ const server = http.createServer(async(req: any, res: any) => {
                     let httpMessage:string = "";
                     let hashPassword:string = "";
 
-                    req.on('data', async (data: any) => {
-                        let body: userInfo = await JSON.parse(data);
+                    req.on('data', async (data: Buffer) => {
+                        
+                        let body: userInfo = await JSON.parse(data.toString());
                         console.log(body);
                         username = body.username;
                         password = body.password;
@@ -73,16 +89,19 @@ const server = http.createServer(async(req: any, res: any) => {
                         const values = [username];
                         const [rows, fields] = await connectToDB.execute(query, values);
                         if (rows.length === 0) {
-                            statusCode = 404;
+                            //We want to keep the error code for if the username is not found in the database
+                            //and the password is invalid because we don't want to people to know whether the password is incorrect or the username
+                            statusCode = 401;
                             httpMessage = "User not found";
                         } else {
                             hashPassword = rows[0].Password;
                             const isMatch: boolean = await bcrypt.compare(password, hashPassword);
                             //In Here we are going
-                            console.log("Password Match:", isMatch);
                             if (isMatch) {
                                 statusCode = 200;
-                                httpMessage = "Valid user: " + rows[0].message;
+                                const payload:payload = {username: body.username, message: rows[0].message}; 
+                                httpMessage = JSON.stringify(jwtAuth.jwtSign(payload));
+                                
                             } else {
                                 statusCode = 401; // Unauthorized
                                 httpMessage = "User not found";
@@ -122,7 +141,6 @@ const server = http.createServer(async(req: any, res: any) => {
                             //For the query just follow the same format as stated in the mysql2 docs
                             const query = 'INSERT INTO `user`(`username`, `password`, `message`) VALUES (?, ?, ?)';
                             const values = [username, hash, message];
-                            console.log(username+ ", " + password + ", " + ", " + message)
                             const [result, fields] = await connectToDB.execute(query , values);
                             
                             res.writeHead(201, {'Content-Type':'text/plain'});
