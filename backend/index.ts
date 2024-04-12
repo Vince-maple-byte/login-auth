@@ -78,13 +78,14 @@ const server = http.createServer(async(req: any, res: any) => {
                         } else {
                             hashPassword = rows[0].Password;
                             const isMatch: boolean = await bcrypt.compare(password, hashPassword);
+                            //In Here we are going
                             console.log("Password Match:", isMatch);
                             if (isMatch) {
                                 statusCode = 200;
                                 httpMessage = "Valid user: " + rows[0].message;
                             } else {
                                 statusCode = 401; // Unauthorized
-                                httpMessage = "Invalid password";
+                                httpMessage = "User not found";
                             }
                         }
                         res.writeHead(statusCode, {'Content-Type':'text/plain'});
@@ -99,9 +100,9 @@ const server = http.createServer(async(req: any, res: any) => {
         case '/signup':
             if(req.method === 'POST'){
                 try {
-                    let username:string = "";
-                    let password:string = "";
-                    let message;
+                    let username:string;
+                    let password:string;
+                    let message:string;
                     //To access the body of a http request in node:http we need to use the req.on('data')
                     //Similar to how we did in the tcp server, but we don't have to parse the entire http message
                     req.on('data', async(data:any) => {
@@ -109,7 +110,13 @@ const server = http.createServer(async(req: any, res: any) => {
                         console.log(body);
                         username= body.username;
                         password= body.password;
-                        message = body.message;
+                        if(body.message === undefined){
+                            message = "";
+                        }
+                        else{
+                            message = body.message;
+                        }
+                        
                         const hash = await bcrypt.hash(password, saltRounds);
                         try {
                             //For the query just follow the same format as stated in the mysql2 docs
