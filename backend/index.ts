@@ -16,15 +16,11 @@ type responseData = {
     data: string;
 }
 
-type signUp = {
+//The username, password, and message object type that is going to be used.
+type userInfo = {
     username: string;
     password: string;
-    message: string;
-}
-
-type loginIn = {
-    username: string;
-    password: string;
+    message?: string;
 }
 
 const server = http.createServer(async(req: any, res: any) => {
@@ -41,7 +37,7 @@ const server = http.createServer(async(req: any, res: any) => {
         case '/':
             //For when an user needs to delete their account. Need to confirm if the password is valid or not with jwt
             if(req.method === 'DELETE'){
-
+                let username:string 
             }
 
             //For when an user wants to update there password or the message. Need to confirm if the password is valid or not with jwt
@@ -69,7 +65,7 @@ const server = http.createServer(async(req: any, res: any) => {
                     let hashPassword:string = "";
 
                     req.on('data', async (data: any) => {
-                        let body: loginIn = await JSON.parse(data);
+                        let body: userInfo = await JSON.parse(data);
                         console.log(body);
                         username = body.username;
                         password = body.password;
@@ -81,9 +77,6 @@ const server = http.createServer(async(req: any, res: any) => {
                             httpMessage = "User not found";
                         } else {
                             hashPassword = rows[0].Password;
-                            console.log("Retrieved Hash:", hashPassword);
-                            console.log(hashPassword.length);
-                            console.log(password.charCodeAt(0))
                             const isMatch: boolean = await bcrypt.compare(password, hashPassword);
                             console.log("Password Match:", isMatch);
                             if (isMatch) {
@@ -108,11 +101,11 @@ const server = http.createServer(async(req: any, res: any) => {
                 try {
                     let username:string = "";
                     let password:string = "";
-                    let message:string = "";
+                    let message;
                     //To access the body of a http request in node:http we need to use the req.on('data')
                     //Similar to how we did in the tcp server, but we don't have to parse the entire http message
                     req.on('data', async(data:any) => {
-                        let body:signUp = JSON.parse(data);
+                        let body:userInfo = JSON.parse(data);
                         console.log(body);
                         username= body.username;
                         password= body.password;
@@ -132,7 +125,7 @@ const server = http.createServer(async(req: any, res: any) => {
                             res.writeHead(501, {'Content-Type':'text/plain'});
                             res.write("Server error in trying to sign a user up");
                             res.end();
-                            console.error(error + "\n Ericdoa");
+                            console.error(error);
                         }
                     });
                 } catch (error) {
@@ -151,50 +144,7 @@ const server = http.createServer(async(req: any, res: any) => {
             res.end();
             break;
     }
-    
-    // switch (req.method) {
-    //     case 'POST':
-    //         console.log('Post request ' + req.url);
-    //         //We need to make an if statement checking if the location is in the 
-    //         //login page or the sign up page
 
-    //         // if(req.url){
-
-    //         // }
-
-            
-    //         //Makes the header based on whatever Content-Type that we want, but
-    //         //Since we are sending a json data we use application/json
-    //         res.writeHead(200, {'Content-Type':'application/json'});
-    //         //res.end just specifies what we are sending to the body
-    //         res.end(JSON.stringify({
-    //             data: json.data,
-    //         }));
-            
-    //         break;
-    //     case 'GET':
-    //         if(req.url == '/login'){
-    //             console.log('We are in the login page');
-                
-    //         }
-    //         else{
-    //             //console.log("This is not a post request");
-    //             res.writeHead(200, {'Content-Type':'text/plain'});
-    //             res.write("Welcome to this server");
-    //             res.end();
-    //         }
-    //         break;
-        
-    //     case 'PUT':
-    //         break;
-        
-    //     case 'DELETE':
-    //         break;
-    
-    //     default:
-
-    //         break;
-    //}
 
     
     
