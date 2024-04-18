@@ -12,7 +12,6 @@ const host: string = process.env.HOST || 'localhost';
 const saltRounds: number = 10;
 
 //Mysql database connection
-console.log(process.env.DB_USER);
 //Learned how we can create objects in typescript by specifying the object data types
 type responseData = {
     data: string;
@@ -33,7 +32,7 @@ type payload = {
 }
 
 const server = http.createServer(async(req: any, res: any) => {
-    //console.log(req.url + ": "+ req.method);
+    
     //Example of sending a http response from a post request
     let json :responseData = {
         data: `${req.url}`
@@ -48,11 +47,23 @@ const server = http.createServer(async(req: any, res: any) => {
             if(req.method === 'DELETE'){
                 const token = req.headers.authorization.split(" ")[1];
                 const user = jwtAuth.jwtVerify(token);
-                console.log(user);
-
-                res.writeHead(201, {'Content-Type':'text/plain'});
-                res.write(JSON.stringify(user));
-                res.end();
+                if(user == null){
+                    res.writeHead(403, {'Content-Type':'text/plain'});
+                    res.write("User does not exist");
+                    res.end();
+                }
+                else{
+                    const deleteUser = async()=>{
+                        const query = 'DELETE FROM `user` WHERE `username` = ? LIMIT 1';
+                        const values = [user.username];
+                        const [rows, fields] = await connectToDB.execute(query, values);
+                        res.writeHead(201, {'Content-Type':'text/plain'});
+                        res.write(`${user.username} has been deleted`);
+                        res.end();
+                    }
+                    deleteUser();
+                }
+                
             }
 
             //For when an user wants to update there password or the message. Need to confirm if the password is valid or not with jwt
@@ -62,7 +73,27 @@ const server = http.createServer(async(req: any, res: any) => {
 
             //Return the user message
             if(req.method === 'GET'){
-
+                const token = req.headers.authorization.split(" ")[1];
+                const user = jwtAuth.jwtVerify(token);
+                if(user == null){
+                    res.writeHead(403, {'Content-Type':'text/plain'});
+                    res.write("User does not exist");
+                    res.end();
+                }
+                else{
+                    const getMessage = async()=>{
+                        const query = 'SELECT `message` FROM `user` WHERE `username` = ?';
+                        const values = [user.username];
+                        const [rows, fields] = await connectToDB.execute(query, values);
+                        
+                        res.writeHead(201, {'Content-Type':'application/json'});
+                        res.write(JSON.stringify(rows[0]));
+                        res.end();
+                    }
+                    getMessage();
+                    
+                }
+                
             }
             
             // res.writeHead(200, {'Content-Type':'text/plain'});
@@ -82,7 +113,6 @@ const server = http.createServer(async(req: any, res: any) => {
                     req.on('data', async (data: Buffer) => {
                         
                         let body: userInfo = await JSON.parse(data.toString());
-                        console.log(body);
                         username = body.username;
                         password = body.password;
                         const query: string = 'SELECT * FROM `user` WHERE `Username` = ?';
@@ -126,7 +156,6 @@ const server = http.createServer(async(req: any, res: any) => {
                     //Similar to how we did in the tcp server, but we don't have to parse the entire http message
                     req.on('data', async(data:any) => {
                         let body:userInfo = JSON.parse(data);
-                        console.log(body);
                         username= body.username;
                         password= body.password;
                         if(body.message === undefined){

@@ -2,7 +2,7 @@
 const jwt = require('jsonwebtoken');
 //Might need to make a new object type that extends the userInfo to make a flag to see if the 
 const jwtSign = (payload) => {
-    const token = jwt.sign(payload, process.env.SECRET_KEY);
+    const token = jwt.sign(payload, process.env.SECRET_KEY, { expiresIn: '1m' });
     return { accessToken: token };
 };
 const jwtVerify = (token) => {
