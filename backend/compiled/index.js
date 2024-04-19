@@ -39,8 +39,28 @@ const server = http.createServer(async (req, res) => {
                     deleteUser();
                 }
             }
-            //For when an user wants to update there password or the message. Need to confirm if the password is valid or not with jwt
+            //This is going to be used to update the message
             if (req.method === 'PUT') {
+                req.on('data', async (data) => {
+                    const token = req.headers.authorization.split(" ")[1];
+                    const user = jwtAuth.jwtVerify(token);
+                    console.log(user);
+                    if (user == null) {
+                        res.writeHead(403, { 'Content-Type': 'text/plain' });
+                        res.write("User does not exist");
+                        res.end();
+                    }
+                    else {
+                        let body = JSON.parse(data.toString());
+                        const query = 'UPDATE `user` SET `message` = ? WHERE `username` = ?';
+                        const values = [body.message, user.username.toString()];
+                        const [rows, fields] = await connectToDB.execute(query, values);
+                        console.log(rows);
+                        res.writeHead(201, { 'Content-Type': 'application/json' });
+                        res.write("User has been updated");
+                        res.end();
+                    }
+                });
             }
             //Return the user message
             if (req.method === 'GET') {
@@ -52,6 +72,7 @@ const server = http.createServer(async (req, res) => {
                     res.end();
                 }
                 else {
+                    //We have to make an async function to the the message based on the username;
                     const getMessage = async () => {
                         const query = 'SELECT `message` FROM `user` WHERE `username` = ?';
                         const values = [user.username];
@@ -63,9 +84,6 @@ const server = http.createServer(async (req, res) => {
                     getMessage();
                 }
             }
-            // res.writeHead(200, {'Content-Type':'text/plain'});
-            // res.write("Welcome to login practice go to the url paths /login and /signup");
-            // res.end();
             break;
         case '/login':
             if (req.method === 'POST') {
