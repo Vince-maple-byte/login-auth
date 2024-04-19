@@ -79,6 +79,7 @@ const server = http.createServer(async(req: any, res: any) => {
                     }
                     else{
                         let body = JSON.parse(data.toString());
+                        //This query is how we update a column in a specific row
                         const query = 'UPDATE `user` SET `message` = ? WHERE `username` = ?';
                         const values = [body.message, user.username.toString()];
                         const [rows, fields] = await connectToDB.execute(query, values);
