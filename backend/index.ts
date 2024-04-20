@@ -52,12 +52,11 @@ const server = http.createServer(async(req: any, res: any) => {
     deleteUser();
     */
     switch (req.url) {
-        case '/':
+        case '/message':
             //For when an user needs to delete their account. Need to confirm if the password is valid or not with jwt
             if(req.method === 'DELETE'){
                 const token = req.headers.authorization.split(" ")[1];
                 const user = jwtAuth.jwtVerify(token);
-                console.log(user);
                 if(user == null){
                     res.writeHead(403, {'Content-Type':'text/plain'});
                     res.write("User does not exist");
@@ -68,7 +67,6 @@ const server = http.createServer(async(req: any, res: any) => {
                     const query = 'UPDATE `user` SET `message` = ? WHERE `username` = ?';
                     const values = ["", user.username.toString()];
                     const [rows, fields] = await connectToDB.execute(query, values);
-                    console.log(rows);
 
                     res.writeHead(201, {'Content-Type':'application/json'});
                     res.write("User has been updated");
@@ -81,7 +79,6 @@ const server = http.createServer(async(req: any, res: any) => {
                 req.on('data', async(data: Buffer) => {
                     const token = req.headers.authorization.split(" ")[1];
                     const user = jwtAuth.jwtVerify(token);
-                    console.log(user);
                     if(user == null){
                         res.writeHead(403, {'Content-Type':'text/plain'});
                         res.write("User does not exist");
@@ -93,7 +90,6 @@ const server = http.createServer(async(req: any, res: any) => {
                         const query = 'UPDATE `user` SET `message` = ? WHERE `username` = ?';
                         const values = [body.message, user.username.toString()];
                         const [rows, fields] = await connectToDB.execute(query, values);
-                        console.log(rows);
 
                         res.writeHead(201, {'Content-Type':'application/json'});
                         res.write("User has been updated");
@@ -199,7 +195,7 @@ const server = http.createServer(async(req: any, res: any) => {
                         const userExists = 'SELECT `username` FROM `user` WHERE `username` = ?';
                         const value = [username];
                         const [result, fields] = await connectToDB.execute(userExists , value);
-                        if(result[0].username.length != 0){
+                        if(result.length !== 0){
                             res.writeHead(405, {'Content-Type':'text/plain'});
                             res.write("Username already exists");
                             res.end();
@@ -230,6 +226,103 @@ const server = http.createServer(async(req: any, res: any) => {
                 }
                 
             }
+            break;
+        
+        case "/account":
+            if(req.method === 'PUT'){
+                //They need to re enter the username and password before trying to change it
+                try {
+                    let statusCode:number = 200;
+                    let httpMessage:string = "";
+                    let hashPassword:string = "";
+
+                    req.on('data', async (data: Buffer) => {
+                        
+                        let body: any = await JSON.parse(data.toString());
+                        let username = body.username;
+                        let oldPassword = body.oldPassword;
+                        let newPassword = body.newPassword;
+                        const query: string = 'SELECT * FROM `user` WHERE `Username` = ?';
+                        const values = [username];
+                        const [rows, fields] = await connectToDB.execute(query, values);
+                        if (rows.length === 0) {
+                            //We want to keep the error code for if the username is not found in the database
+                            //and the password is invalid because we don't want to people to know whether the password is incorrect or the username
+                            statusCode = 401;
+                            httpMessage = "User not found";
+                        } else {
+                            hashPassword = rows[0].Password;
+                            const isMatch: boolean = await bcrypt.compare(oldPassword, hashPassword);
+                            //In Here we are going
+                            if (isMatch) {
+                                statusCode = 209;
+                                const queryPassword = 'UPDATE `user` SET `password` = ? WHERE `username` = ?';
+                                const hash = await bcrypt.hash(newPassword, saltRounds);
+                                const valuePassword = [hash, username];
+                                const [rows, fields] = await connectToDB.execute(queryPassword, valuePassword);
+                                httpMessage = "Password has been updated";
+                                
+                            } else {
+                                statusCode = 401; // Unauthorized
+                                httpMessage = "User not found";
+                            }
+                        }
+                        res.writeHead(statusCode, {'Content-Type':'text/plain'});
+                        res.write(httpMessage);
+                        res.end();
+                    });
+                } catch (error) {
+                    console.log(error);
+                }
+            }
+
+            if(req.method === 'DELETE'){
+                //They need to re enter the username and password before trying to delete the account
+                try {
+                    let statusCode:number = 200;
+                    let httpMessage:string = "";
+                    let hashPassword:string = "";
+
+                    req.on('data', async (data: Buffer) => {
+                        
+                        let body: any = await JSON.parse(data.toString());
+                        let username = body.username;
+                        let oldPassword = body.password;
+                        const query: string = 'SELECT * FROM `user` WHERE `Username` = ?';
+                        const values = [username];
+                        const [rows, fields] = await connectToDB.execute(query, values);
+                        if (rows.length === 0) {
+                            //We want to keep the error code for if the username is not found in the database
+                            //and the password is invalid because we don't want to people to know whether the password is incorrect or the username
+                            statusCode = 401;
+                            httpMessage = "User not found";
+                        } else {
+                            hashPassword = rows[0].Password;
+                            const isMatch: boolean = await bcrypt.compare(oldPassword, hashPassword);
+                            //In Here we are going
+                            if (isMatch) {
+                                statusCode = 210;
+                                const queryPassword = 'DELETE FROM `user` WHERE `username` = ?';
+                                const valuePassword = [username];
+                                const [rows, fields] = await connectToDB.execute(queryPassword, valuePassword);
+                                httpMessage = "Account has been deleted";
+                                
+                            } else {
+                                statusCode = 401; // Unauthorized
+                                httpMessage = "User not found";
+                            }
+                        }
+                        res.writeHead(statusCode, {'Content-Type':'text/plain'});
+                        res.write(httpMessage);
+                        res.end();
+                    });
+                } catch (error) {
+                    console.log(error);
+                }
+            }
+
+
+
             break;
     
         default:
