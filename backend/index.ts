@@ -40,30 +40,40 @@ const server = http.createServer(async(req: any, res: any) => {
     //Mysql database connection. Since we are making this database in a node:http instead of express.js 
     //we need to make the connection inside of the http.createServer() method
     const connectToDB = await connection.dbConnection();
-
+    /*
+    const deleteUser = async()=>{
+        const query = 'DELETE FROM `user` WHERE `username` = ? LIMIT 1';
+        const values = [user.username];
+        const [rows, fields] = await connectToDB.execute(query, values);
+        res.writeHead(201, {'Content-Type':'text/plain'});
+        res.write(`${user.username} has been deleted`);
+        res.end();
+    }
+    deleteUser();
+    */
     switch (req.url) {
         case '/':
             //For when an user needs to delete their account. Need to confirm if the password is valid or not with jwt
             if(req.method === 'DELETE'){
                 const token = req.headers.authorization.split(" ")[1];
                 const user = jwtAuth.jwtVerify(token);
+                console.log(user);
                 if(user == null){
                     res.writeHead(403, {'Content-Type':'text/plain'});
                     res.write("User does not exist");
                     res.end();
                 }
                 else{
-                    const deleteUser = async()=>{
-                        const query = 'DELETE FROM `user` WHERE `username` = ? LIMIT 1';
-                        const values = [user.username];
-                        const [rows, fields] = await connectToDB.execute(query, values);
-                        res.writeHead(201, {'Content-Type':'text/plain'});
-                        res.write(`${user.username} has been deleted`);
-                        res.end();
-                    }
-                    deleteUser();
+                    //This query is how we update a column in a specific row into an empty string
+                    const query = 'UPDATE `user` SET `message` = ? WHERE `username` = ?';
+                    const values = ["", user.username.toString()];
+                    const [rows, fields] = await connectToDB.execute(query, values);
+                    console.log(rows);
+
+                    res.writeHead(201, {'Content-Type':'application/json'});
+                    res.write("User has been updated");
+                    res.end();
                 }
-                
             }
 
             //This is going to be used to update the message
@@ -185,22 +195,31 @@ const server = http.createServer(async(req: any, res: any) => {
                         else{
                             message = body.message;
                         }
-                        
-                        const hash = await bcrypt.hash(password, saltRounds);
-                        try {
-                            //For the query just follow the same format as stated in the mysql2 docs
-                            const query = 'INSERT INTO `user`(`username`, `password`, `message`) VALUES (?, ?, ?)';
-                            const values = [username, hash, message];
-                            const [result, fields] = await connectToDB.execute(query , values);
-                            
-                            res.writeHead(201, {'Content-Type':'text/plain'});
-                            res.write("Successfully created the new user");
+
+                        const userExists = 'SELECT `username` FROM `user` WHERE `username` = ?';
+                        const value = [username];
+                        const [result, fields] = await connectToDB.execute(userExists , value);
+                        if(result[0].username.length != 0){
+                            res.writeHead(405, {'Content-Type':'text/plain'});
+                            res.write("Username already exists");
                             res.end();
-                        } catch (error) {
-                            res.writeHead(501, {'Content-Type':'text/plain'});
-                            res.write("Server error in trying to sign a user up");
-                            res.end();
-                            console.error(error);
+                        }else{
+                            const hash = await bcrypt.hash(password, saltRounds);
+                            try {
+                                //For the query just follow the same format as stated in the mysql2 docs
+                                const query = 'INSERT INTO `user`(`username`, `password`, `message`) VALUES (?, ?, ?)';
+                                const values = [username, hash, message];
+                                const [result, fields] = await connectToDB.execute(query , values);
+                                
+                                res.writeHead(201, {'Content-Type':'text/plain'});
+                                res.write("Successfully created the new user");
+                                res.end();
+                            } catch (error) {
+                                res.writeHead(501, {'Content-Type':'text/plain'});
+                                res.write("Server error in trying to sign a user up");
+                                res.end();
+                                console.error(error);
+                            }
                         }
                     });
                 } catch (error) {
